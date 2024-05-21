@@ -1,0 +1,108 @@
+-------- В ожидании --------------------------
+
+declare @getDateOrdHeadPen DATE
+set @getDateOrdHeadPen =  GETDATE()
+--- Кол-во заказов ---
+select 
+       count(ord_ID) as ordQty
+from LV_Order
+where ord_InputDate = @getDateOrdHeadPen 
+           and ord_StatusID = 1 
+		   and ord_DepositorID = 13
+
+-- Данные заказа в ожидании --
+declare @getDateOrdBodyPen DATE
+set @getDateOrdBodyPen = convert(DATE, GETDATE())
+select 
+        ord_Code AS orderName,
+		odv_Address AS orderAddres,
+		convert(DATE, ord_ExpDeliveryDate) AS ordDate
+from LV_Order
+left join LV_OrderDelivery on ord_ID = odv_OrderID
+where ord_InputDate = @getDateOrdBodyPen  and ord_DepositorID = 13 and ord_StatusID = 1
+
+
+-------- Для ОТБОРА / ПОПОЛНЕНИЕ (BODY) --------------------------
+declare @getDateOrdHeadOtbor DATE
+declare @CountTask int
+
+set @getDateOrdHeadOtbor = convert(DATE, GETDATE())
+
+set @CountTask = (
+    select count(distinct ord_Code) 
+    from LV_Order
+    left join LV_OrderItem on ori_OrderID = ord_ID
+    left join LV_OrderShipItem on osi_OrderItemID = ori_ID
+    left join V_OrderStatus on ors_ID = osi_StatusID and LanguageID = 4
+    left join LV_OrderDelivery on ord_ID = odv_OrderID
+    where ord_InputDate = @getDateOrdHeadOtbor 
+    and ord_StatusID = 2 
+    and osi_StatusID in (4, 2) -- ОТБОР
+)
+
+select COUNT(tsk_Code) + @CountTask as TotalCount,
+          '' AS Addres, 
+		  '' AS Date, 
+		  '' As Status
+from LV_Task 
+where tsk_TransactionTypeID = 13 
+and tsk_StatusID = 2
+
+UNION ALL
+
+select ord_Code, odv_Address, convert(DATE, ord_ExpDeliveryDate) AS Date, Status
+from LV_Order
+left join LV_OrderItem on ori_OrderID = ord_ID
+left join LV_OrderShipItem on osi_OrderItemID = ori_ID
+left join V_OrderStatus on ors_ID = osi_StatusID and LanguageID = 4
+left join LV_OrderDelivery on ord_ID = odv_OrderID
+where ord_InputDate = @getDateOrdHeadOtbor 
+and ord_StatusID = 2 
+and osi_StatusID in (3, 2) -- ОТБОР
+group by ord_Code, odv_Address, ord_ExpDeliveryDate, Status
+
+--------- ОТОБРАН --------
+    select count(distinct ord_Code) AS OtobranQty
+    from LV_Order
+    left join LV_OrderItem on ori_OrderID = ord_ID
+    left join LV_OrderShipItem on osi_OrderItemID = ori_ID
+    left join V_OrderStatus on ors_ID = osi_StatusID and LanguageID = 4
+    left join LV_OrderDelivery on ord_ID = odv_OrderID
+    where ord_InputDate = @getDateOrdHeadOtbor 
+    and osi_StatusID = 4 -- ОТБОРАН
+
+	select ord_Code, odv_Address, convert(DATE,ord_ExpDeliveryDate) AS Date, Status
+from LV_Order
+left join LV_OrderItem on ori_OrderID = ord_ID
+left join LV_OrderShipItem on osi_OrderItemID = ori_ID
+left join V_OrderStatus on ors_ID = osi_StatusID and LanguageID = 4
+left join LV_OrderDelivery on ord_ID = odv_OrderID
+    where ord_InputDate = @getDateOrdHeadOtbor 
+    and osi_StatusID = 4 -- ОТБОРАН
+group by ord_Code, odv_Address, ord_ExpDeliveryDate, Status
+
+---ВЫПОЛНЕН/ОТМЕНЕН--
+
+select 
+       count(ord_ID) as ordQty
+from LV_Order
+where ord_InputDate = @getDateOrdHeadPen 
+           and ord_StatusID in (3,4) 
+		   and ord_DepositorID = 13
+
+select 
+        ord_Code AS orderName,
+		odv_Address AS orderAddres,
+		convert (DATE,ord_ExpDeliveryDate) AS ordDate,
+		MessageName AS Status
+from LV_Order
+left join LV_OrderDelivery on ord_ID = odv_OrderID
+left join V_ProgressStatus on ord_StatusID = pst_ID and LanguageID = 4
+where ord_InputDate = @getDateOrdBodyPen  and ord_DepositorID = 13 and ord_StatusID in (3,4)
+
+
+
+
+
+
+
